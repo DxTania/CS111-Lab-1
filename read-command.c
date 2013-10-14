@@ -139,7 +139,7 @@ extractWordInputOutput(char* currentWord,command_t command)
   int currentWord_size = strlen(currentWord);
   char** word = checked_malloc(sizeof(char*));
 
-  command->type = SIMPLE_COMMAND;  
+  command->type = SIMPLE_COMMAND;
   switch(isRedirectionCommand(currentWord))
   {
    // case 2: //TODO ERASE THIS LINE!!!! THIS WILL BREAK SHIT
@@ -222,7 +222,9 @@ extractWordInputOutput(char* currentWord,command_t command)
       break;
  
   }
-
+  // this gives a seg fault
+  printf("%c\n", currentWord[5]);
+  printf("%c\n", (*command->u.word)[5]);
 }
 
 int getRidOfExtraWhitespaces(char* word)
@@ -536,16 +538,10 @@ command_t createSimpleCommand(char* currentWord)
   // TODO: scan for I/O redirections here
  
   command_t simpleCommand = checked_malloc(sizeof(struct command));
-  // int i = 0;
 
   extractWordInputOutput(currentWord, simpleCommand);
 
-  // make word a char array WHY DOESN'T THIS WORK! (segfault for u.word but not current word)
-  // while(*simpleCommand->u.word[i] != '\0' && i < 2) {
-  //   printf("%c", *simpleCommand->u.word[i]);
-  //   i++;
-  // }
-  // printf("The word array is %s and output is %s", *simpleCommand->u.word, simpleCommand->output); 
+  // lol parenthesis
 
   //if(simpleCommand->input != NULL || simpleCommand->output != NULL)
     //printf("simpleCommand input is %s output is %s, word is %s\n",simpleCommand->input,simpleCommand->output,*simpleCommand->u.word);
@@ -650,4 +646,3 @@ read_command_stream (command_stream_t s)
   s->currentCommand++;
   return command;
 }
-
