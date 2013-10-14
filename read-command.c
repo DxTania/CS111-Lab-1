@@ -138,6 +138,7 @@ extractWordInputOutput(char* currentWord,command_t command)
   
   int currentWord_size = strlen(currentWord);
   char** word = checked_malloc(sizeof(char*));
+
   command->type = SIMPLE_COMMAND;  
   switch(isRedirectionCommand(currentWord))
   {
@@ -155,7 +156,7 @@ extractWordInputOutput(char* currentWord,command_t command)
         {
           int output_size = currentWord_size - i;// includes null byte
           char *outputBuffer = checked_malloc(sizeof(char)*output_size);
-          strcpy(outputBuffer,&currentWord[i+1]);
+          strcpy(outputBuffer, &currentWord[i+1]);
 
           command->output = outputBuffer;
     
@@ -164,7 +165,6 @@ extractWordInputOutput(char* currentWord,command_t command)
           getRidOfExtraWhitespaces(currentWord);
           *word = currentWord;
           command->u.word = word;
-          
           break;
         }
         else if(currentWord[i] == '<')
@@ -189,7 +189,7 @@ extractWordInputOutput(char* currentWord,command_t command)
             while(currentWord[j] != '>')
             {
               if(currentWord[j] == '\0')
-                error(1,0,"%i: Syntax error. Ambiguous redirections.",g_lineNumber);
+                error(1,0,"%i: Syntax error. Ambiguous redirections.", g_lineNumber);
               j++;
             }
             
@@ -199,9 +199,9 @@ extractWordInputOutput(char* currentWord,command_t command)
             char *inputBuffer = checked_malloc(sizeof(char)*input_size);
             char *outputBuffer= checked_malloc(sizeof(char)*output_size);
 
-            strncpy(inputBuffer,&currentWord[i+1],input_size - 1);
+            strncpy(inputBuffer,&currentWord[i+1], input_size - 1);
             inputBuffer[input_size - 1] = '\0'; 
-            strcpy(outputBuffer,&currentWord[j+1]);
+            strcpy(outputBuffer, &currentWord[j+1]);
  
             command->output = outputBuffer;
             command->input = inputBuffer;
@@ -470,7 +470,7 @@ make_command_stream (int (*get_next_byte) (void *),
     else if (!possibleNewCommand) 
     {
       // Grow current word which is an operand if necessary
-      if ((numChars * sizeof(char)) == currentWordSize)
+      if ((numChars * sizeof(char)) >= currentWordSize)
       {
         currentWordSize *= 2;
         checked_realloc(currentWord, currentWordSize);
@@ -511,6 +511,7 @@ make_command_stream (int (*get_next_byte) (void *),
   // Push last word onto operand stack and evaluate the rest
   if (!isOperator) 
   {
+    currentWord[numChars] = '\0';
     getRidOfExtraWhitespaces(currentWord);
     push_operand(createSimpleCommand(currentWord));
   } else {
@@ -535,9 +536,17 @@ command_t createSimpleCommand(char* currentWord)
   // TODO: scan for I/O redirections here
  
   command_t simpleCommand = checked_malloc(sizeof(struct command));
+  // int i = 0;
 
-  extractWordInputOutput(currentWord,simpleCommand);  
-  
+  extractWordInputOutput(currentWord, simpleCommand);
+
+  // make word a char array WHY DOESN'T THIS WORK! (segfault for u.word but not current word)
+  // while(*simpleCommand->u.word[i] != '\0' && i < 2) {
+  //   printf("%c", *simpleCommand->u.word[i]);
+  //   i++;
+  // }
+  // printf("The word array is %s and output is %s", *simpleCommand->u.word, simpleCommand->output); 
+
   //if(simpleCommand->input != NULL || simpleCommand->output != NULL)
     //printf("simpleCommand input is %s output is %s, word is %s\n",simpleCommand->input,simpleCommand->output,*simpleCommand->u.word);
   return simpleCommand;
