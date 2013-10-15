@@ -3,6 +3,7 @@
 #define COMMAND_H
 
 #include <stdbool.h>
+#include <sys/types.h>
 
 typedef struct command *command_t;
 typedef struct command_stream *command_stream_t;
@@ -22,6 +23,16 @@ void print_command (command_t);
 
 /* Execute a command.  Use "time travel" if the flag is set.  */
 void execute_command (command_t, bool);
+
+pid_t execute_and_or_command (command_t command);
+pid_t execute_fork_command (command_t command);
+int execute_simple_command (command_t command);
+pid_t execute_subshell_command(command_t command);
+
+int isRedirectionCommand(char* word);
+int isValidWordCharacter(char* word);
+void checkForConsecutiveRedir(char* word);
+
 
 /* Return the exit status of a command, which must have previously
    been executed.  Wait for the command, if it is not already finished.  */

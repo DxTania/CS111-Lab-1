@@ -25,107 +25,6 @@ enum
 
 int g_lineNumber = 0;
 
-void checkForConsecutiveRedir(char* word)
-{
-  int i = 0;
-  int j = 0;
-  int wordStarted = 0;
-
-  while(word[i] != '\0')
-  {
-    if(word[i] == '>' || word[i] == '<')
-    {
-      
-      j = i + 1;
-      if(wordStarted == 0 || word[j] == '\0') // redirects must be followed by a word
-      {
-        error(1,0,"%i: Syntax Error. Bad redirection.", g_lineNumber);
-      }
-      else // if we found a > or < we are no longer inside of a word
-      {
-        wordStarted = 0;
-      }
-      while(word[j] != '\0') // keep checking after redirect
-      { 
-        if(word[j] == ' ') // ignore spaces
-        {
-          j++;
-          continue;
-        }
-        else if( word[j] == '<' || word[j] == '>' || word[j] == '\0') // if this comes before we actually find a good character, error
-        {
-          error(1,0,"%i: Syntax Error. Bad redirection.", g_lineNumber);
-        }
-        else 
-        {
-          break;
-        }
-      }  
-    }
-    else if (word[i] != ' ')
-    {
-      wordStarted = 1;
-    }
-     
-    i++;
-  }
-}
-
-int isValidWordCharacter(char* word)
-{
-  int i = 0;
-
-  checkForConsecutiveRedir(word);
-
-  while(word[i] != '\0')
-  {
-    if(isdigit(word[i]) || isalpha(word[i]))
-    {
-      i++;
-      continue;
-    }
-
-    switch(word[i])
-    {
-    case '<'://not really
-    case '>'://not really
-    case '!':
-    case '%':
-    case '+':
-    case ',':
-    case '-':
-    case '.':
-    case '/':
-    case ':':
-    case '@':
-    case '^':
-    case '_':
-    case ' '://not really
-      i++;
-      continue;
-    default:
-      return 0;
-    }
-  }
-  
-  return 1;
-}
-
-int //returns 0 if not, otherwise returns the number of redirection characters
-isRedirectionCommand(char* word)
-{
-  int i = 0;
-  int count = 0;
-  while(word[i] != '\0')
-  {
-    if(word[i] == '<' || word[i] == '>')
-      count++;
-    i++;
-  }
-
-  return count;
-}
-
 /**
  * Creates an array of cstrings (char*) to words of the command
  * (delimited by spaces)
@@ -161,6 +60,7 @@ char** createWordArray(char* words)
       }
     }
   }
+  printf("Created word array for %s\n", words);
   return wordArray;
 }
 
@@ -454,13 +354,13 @@ make_command_stream (int (*get_next_byte) (void *),
      // if(operator_stack_top() == RIGHTP ) //eval stack until a LEFTP is found
       if(i == RIGHTP)
       {
-        //printf("EvalStackuntilLeftP found\n");
+        // printf("EvalStackuntilLeftP found\n");
         evalStackUntilLeftP();
         c = get_next_byte(get_next_byte_argument);
         continue;
       }
       while(g_iOperator_stack_size > 0 && g_iOperand_stack_size > 1 
-          && precedences[operator_stack_top()] >= precedences[i]) 
+          && (precedences[operator_stack_top()] >= precedences[i]))// && operator_stack_top() != LEFTP)) 
       {
         operand2 = pop_operand();
         operand1 = pop_operand();
@@ -613,7 +513,7 @@ void evalStack()
 
   if(g_iOperand_stack_size > 1)
   {
-    error(1,0,"%i: Syntax Error. Incorrect number of elements on operand stack after evalStack\n",g_lineNumber);
+    error(1, 0, "%i: Syntax Error. Incorrect number of elements on operand stack after evalStack\n", g_lineNumber);
   }
 }
 
@@ -632,18 +532,120 @@ void evalStackUntilLeftP()
     operand2 = pop_operand();
     operand1 = pop_operand();
     operatorNumber = pop_operator();
-    push_operand(createCommand( operand1, operand2, operatorNumber));
+    push_operand(createCommand(operand1, operand2, operatorNumber));
   }
 
   pop_operator();// get rid of LEFTP
   
   //convert command at the top of operand stack to subshell command.
   operand1 = pop_operand(); 
-  push_operand(createCommand(operand1,NULL,RIGHTP));
+  push_operand(createCommand(operand1, NULL, RIGHTP));
 
-  //printf("Number of operands left %i\n",g_iOperand_stack_size);
-  //printf("Number of operators left %i\n",g_iOperator_stack_size);
+  // printf("Number of operands left %i\n",g_iOperand_stack_size);
+  // printf("Number of operators left %i\n",g_iOperator_stack_size);
 }
+
+void checkForConsecutiveRedir(char* word)
+{
+  int i = 0;
+  int j = 0;
+  int wordStarted = 0;
+
+  while(word[i] != '\0')
+  {
+    if(word[i] == '>' || word[i] == '<')
+    {
+      
+      j = i + 1;
+      if(wordStarted == 0 || word[j] == '\0') // redirects must be followed by a word
+      {
+        error(1,0,"%i: Syntax Error. Bad redirection.", g_lineNumber);
+      }
+      else // if we found a > or < we are no longer inside of a word
+      {
+        wordStarted = 0;
+      }
+      while(word[j] != '\0') // keep checking after redirect
+      { 
+        if(word[j] == ' ') // ignore spaces
+        {
+          j++;
+          continue;
+        }
+        else if( word[j] == '<' || word[j] == '>' || word[j] == '\0') // if this comes before we actually find a good character, error
+        {
+          error(1,0,"%i: Syntax Error. Bad redirection.", g_lineNumber);
+        }
+        else 
+        {
+          break;
+        }
+      }  
+    }
+    else if (word[i] != ' ')
+    {
+      wordStarted = 1;
+    }
+     
+    i++;
+  }
+}
+
+int isValidWordCharacter(char* word)
+{
+  int i = 0;
+
+  checkForConsecutiveRedir(word);
+
+  while(word[i] != '\0')
+  {
+    if(isdigit(word[i]) || isalpha(word[i]))
+    {
+      i++;
+      continue;
+    }
+
+    switch(word[i])
+    {
+    case '<'://not really
+    case '>'://not really
+    case '!':
+    case '%':
+    case '+':
+    case ',':
+    case '-':
+    case '.':
+    case '/':
+    case ':':
+    case '@':
+    case '^':
+    case '_':
+    case ' '://not really
+      i++;
+      continue;
+    default:
+      return 0;
+    }
+  }
+  
+  return 1;
+}
+
+//returns 0 if not, otherwise returns the number of redirection characters
+int isRedirectionCommand(char* word)
+{
+  int i = 0;
+  int count = 0;
+  while(word[i] != '\0')
+  {
+    if(word[i] == '<' || word[i] == '>')
+      count++;
+    i++;
+  }
+
+  return count;
+}
+
 
 command_t
 read_command_stream (command_stream_t s)

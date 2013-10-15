@@ -11,3 +11,9 @@ which we have not received by this part of the project.
 
 These issues will resolve themselves with further clarification from the TA and more
 test case examples.
+
+
+Stuff that doesn't work:
+
+Executing a subshell command, seg fault when accessing command->u.subshell_command
+Was hoping to make sure (-- && --) && (-- || --) works!
