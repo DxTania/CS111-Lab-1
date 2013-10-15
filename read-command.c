@@ -9,11 +9,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "ctype.h"
-/* FIXME: You may need to add #include directives, macro definitions,
-   static function definitions, etc.  */
-
-/* FIXME: Define the type 'struct command_stream' here.  This should
-   complete the incomplete type declaration in command.h.  */
 
 struct command_stream 
 {
@@ -131,21 +126,57 @@ isRedirectionCommand(char* word)
   return count;
 }
 
-void //extracts the word, and input/output(if applicable) into the command
-extractWordInputOutput(char* currentWord,command_t command)
+/**
+ * Creates an array of cstrings (char*) to words of the command
+ * (delimited by spaces)
+ * Ex. echo hello
+ * char** 0 -> (char* -> echo)
+ *        1 -> (char* -> hello)
+ */
+char** createWordArray(char* words)
+{
+  int numWords = 5, i = 0, j = 0, wordNum = 0; // prediction
+  unsigned int wordArraySize = sizeof(char*) * numWords;
+  char** wordArray = checked_malloc(wordArraySize);
+
+  while(words[i] != '\0' && words[j]) {
+    while(words[j] != ' ' && words[j] != '\0') {
+      j++;
+    }
+    // Now, word[j] is a space, copy i till j-1 into the first word
+    int numChars = j - i;
+    char* word = checked_malloc(sizeof(char) * numChars + 1);
+    memcpy(word, &words[i], sizeof(char) * numChars);
+    word[numChars] = '\0'; // finish the word
+    wordArray[wordNum] = word;
+    if (words[j] == '\0') {
+      break; // we are done;
+    } else {
+      i = ++j;
+      wordNum++;
+      if((sizeof(char*) * wordNum) >= wordArraySize) {
+        // We have more words than the array can currently hold
+        wordArraySize *= 2;
+        checked_realloc(wordArray, wordArraySize);
+      }
+    }
+  }
+  return wordArray;
+}
+
+// Extracts the word, and input/output(if applicable) into the command
+void extractWordInputOutput(char* currentWord,command_t command)
 {
   int i = 0, j = 0, expectAnotherRedir = 0;
-  
   int currentWord_size = strlen(currentWord);
-  char** word = checked_malloc(sizeof(char*));
+  int output_size, input_size;
 
   command->type = SIMPLE_COMMAND;
   switch(isRedirectionCommand(currentWord))
   {
    // case 2: //TODO ERASE THIS LINE!!!! THIS WILL BREAK SHIT
     case 0: // this command is not a redirection command.
-      *word = currentWord;
-      command->u.word = word;
+      command->u.word = createWordArray(currentWord);
       break;
     case 2: // this command has two redirections
       expectAnotherRedir = 1;
@@ -154,34 +185,28 @@ extractWordInputOutput(char* currentWord,command_t command)
       {
         if(currentWord[i] == '>')
         {
-          int output_size = currentWord_size - i;// includes null byte
+          output_size = currentWord_size - i;// includes null byte
           char *outputBuffer = checked_malloc(sizeof(char)*output_size);
           strcpy(outputBuffer, &currentWord[i+1]);
 
           command->output = outputBuffer;
     
           currentWord[i] = '\0';
-           
-          getRidOfExtraWhitespaces(currentWord);
-          *word = currentWord;
-          command->u.word = word;
+          command->u.word = createWordArray(currentWord);
           break;
         }
         else if(currentWord[i] == '<')
         {
           if(expectAnotherRedir == 0)
           {
-            int input_size = currentWord_size - i;//includes null byte
+            input_size = currentWord_size - i;//includes null byte
             char *inputBuffer = checked_malloc(sizeof(char)*input_size);
-            strcpy(inputBuffer,&currentWord[i+1]);
+            strcpy(inputBuffer, &currentWord[i+1]);
           
-
             command->input = inputBuffer;
     
             currentWord[i] = '\0';
-            getRidOfExtraWhitespaces(currentWord);
-            *word = currentWord;
-            command->u.word = word;
+            command->u.word = createWordArray(currentWord);
           }
           else
           {
@@ -192,9 +217,9 @@ extractWordInputOutput(char* currentWord,command_t command)
                 error(1,0,"%i: Syntax error. Ambiguous redirections.", g_lineNumber);
               j++;
             }
-            
-            int input_size = j - i; // includes null byte
-            int output_size = currentWord_size - j;
+ 
+            input_size = j - i; // includes null byte
+            output_size = currentWord_size - j;
              
             char *inputBuffer = checked_malloc(sizeof(char)*input_size);
             char *outputBuffer= checked_malloc(sizeof(char)*output_size);
@@ -207,11 +232,7 @@ extractWordInputOutput(char* currentWord,command_t command)
             command->input = inputBuffer;
 
             currentWord[i] = '\0';
-
-            getRidOfExtraWhitespaces(currentWord);
-            *word = currentWord;
-            command->u.word = word;
-
+            command->u.word = createWordArray(currentWord);
           }
           break;
         }
@@ -222,9 +243,6 @@ extractWordInputOutput(char* currentWord,command_t command)
       break;
  
   }
-  // this gives a seg fault
-  printf("%c\n", currentWord[5]);
-  printf("%c\n", (*command->u.word)[5]);
 }
 
 int getRidOfExtraWhitespaces(char* word)
@@ -277,7 +295,7 @@ make_command_stream (int (*get_next_byte) (void *),
   int operatorNumber = 0;
   int possibleNewCommand = 0;
   unsigned int currentWordSize = 3 * sizeof(char);
-  
+
   char *operand, *lastCommand, *currentWord = checked_malloc(3 * sizeof(char));
   char c = (char) get_next_byte(get_next_byte_argument);
 
@@ -288,18 +306,12 @@ make_command_stream (int (*get_next_byte) (void *),
   commandStream->currentStreamSize = 10 * sizeof(struct command);
   commandStream->numCommands = 0;
   commandStream->currentCommand = 0;
-  
+
   g_lineNumber = 0;
-  
+
   init_stacks();
   while(c != EOF) 
   {
-    /**
-     * Basically if there is a non-operator followed by a newline, there is a possibility
-     * that the current command is done. The current command will be over if the newline
-     * is then followed by another non-operator. Also ignore newlines inside commands.
-     */
-
     if( c == '\n') 
     {
       g_lineNumber++;
@@ -326,16 +338,19 @@ make_command_stream (int (*get_next_byte) (void *),
       continue;
     }
 
- 
+    /**
+     * Basically if there is a non-operator followed by a newline, there is a possibility
+     * that the current command is done. The current command will be over if the newline
+     * is then followed by another non-operator. Also ignore newlines inside commands.
+     */
     if (!isOperator && c == '\n') 
     {
       possibleNewCommand = 1;
-      lastCommand = currentWord; // Used if a new command is actually started to finish the current one
+      // Used if a new command is actually started to finish the current one
+      lastCommand = currentWord;
       c = get_next_byte(get_next_byte_argument);
       if (c != '\n') 
-      {
         continue;
-      }
       else
         g_lineNumber++;
     } 
@@ -424,11 +439,10 @@ make_command_stream (int (*get_next_byte) (void *),
         operand[numChars] = '\0';
        // printf("Pushed %s on operand stack\n", operand);
         //get rid of whitespaces in operand here.
-        int OnlyWhite = getRidOfExtraWhitespaces(operand);
-        if(OnlyWhite == 0)
+        int onlyWhite = getRidOfExtraWhitespaces(operand);
+        if(onlyWhite == 0)
           push_operand(createSimpleCommand(operand));
         numChars = 0;
- 
       }
 
       /**
@@ -535,14 +549,10 @@ command_t createSimpleCommand(char* currentWord)
 
   if (isValidWordCharacter(currentWord) == 0)
     error(1,0,"%i: Invalid word character",g_lineNumber);
-  // TODO: scan for I/O redirections here
  
   command_t simpleCommand = checked_malloc(sizeof(struct command));
 
   extractWordInputOutput(currentWord, simpleCommand);
-
-  // lol parenthesis
-
   //if(simpleCommand->input != NULL || simpleCommand->output != NULL)
     //printf("simpleCommand input is %s output is %s, word is %s\n",simpleCommand->input,simpleCommand->output,*simpleCommand->u.word);
   return simpleCommand;
@@ -646,3 +656,4 @@ read_command_stream (command_stream_t s)
   s->currentCommand++;
   return command;
 }
+
