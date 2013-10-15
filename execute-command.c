@@ -66,7 +66,7 @@ pid_t execute_and_or_command(command_t command)
 
   command_status = left->status;
   if((command->type == AND_COMMAND && left->status == 0) ||
-    (command->type == OR_COMMAND && left->status == 1)) { // left not/successful, execute right side
+    (command->type == OR_COMMAND && left->status == != 0)) { // left not/successful, execute right side
     pid = execute_fork_command(right);
     if (right->type == SIMPLE_COMMAND) {
       waitpid(pid, &status, 0);
@@ -80,7 +80,11 @@ pid_t execute_and_or_command(command_t command)
 
 int execute_simple_command(command_t command)
 {
-  int status = execvp(command->u.word[0], command->u.word);
+  int status;
+  pid_t p = fork();
+  if (p == 0) {
+    execvp(command->u.word[0], command->u.word);
+  }
   // must implement making u.word a char* array before this works properly (createSimpleCommand in read-command.c)
   return status;
 }
