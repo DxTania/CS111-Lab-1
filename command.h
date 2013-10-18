@@ -29,6 +29,8 @@ pid_t execute_fork_command (command_t command);
 int execute_simple_command (command_t command);
 pid_t execute_subshell_command(command_t command);
 
+int execute_pipe_command(commant_t command);
+
 int isRedirectionCommand(char* word);
 int isValidWordCharacter(char* word);
 void checkForConsecutiveRedir(char* word);
