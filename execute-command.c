@@ -46,6 +46,66 @@ execute_command (command_t c, bool time_travel)
   }
 }
 
+int
+execute_pipe_command(command_t command) //a|b
+{
+  int fd[2];
+  int status, status2;
+  pid_t p,p2;
+  //if( pipe(fd) != 0)
+  //  error(1,0,"Could not create pipe fd");
+  if( (p = fork()) < 0)
+    error(1,0,"Fork failed on pipe command");
+  
+  
+  if(p == 0) // do our work here
+  {
+    if( pipe(fd) != 0) //grandfather need not know this
+      error(1,0,"Could not create pipe fd");
+     
+    if( (p2 = fork()) < 0)
+      error(1,0,"Second fork on pipe command failed");
+    
+    if(p2 == 0) // grandchild. will execute a
+    {
+      dup2(fd[1],1);
+      
+      if(fd[1] != 0 && fd[1] != 0 )
+        close(fd[1]);
+      if(fd[0] != 0 && fd[0] != 1)
+        close(fd[0]);
+ 
+      //printf("This goes to fd[1]\n");
+      execute_command(command->u.command[0],false);
+      _exit(command->u.command[0]->status);
+      error(1,0,"Failed to fork at simple command");
+    }
+    else  //child. will execute b
+    {
+      dup2(fd[0],0);
+      if(fd[0] != 0 && fd[0] != 1)
+        close(fd[0]);
+      if(fd[1] != 0 && fd[1] != 0 )
+        close(fd[1]);
+      execute_command(command->u.command[1],false);
+      //printf("I have executed b\n");
+      if(waitpid(p2,&status2,0) < 0)
+        error(1,0,"Child wait failed");
+      if(WEXITSTATUS(status2) < 0)
+        error(1,0,"First process of pipe failed");
+      
+      _exit(command->u.command[1]->status);
+    }
+  }
+  else //wait for child process to return
+  {
+    if(waitpid(p,&status,0) < 0)
+      error(1,0,"Outermost grandparent wait failed");
+    //printf("I am the father and I waited forsons\n");
+    return (command->status = WEXITSTATUS(status));
+  } 
+}
+
 pid_t execute_and_or_command(command_t command)
 {
   pid_t pid;
