@@ -60,7 +60,7 @@ char** createWordArray(char* words)
       }
     }
   }
-  printf("Created word array for %s\n", words);
+  //printf("Created word array for %s\n", words);
   return wordArray;
 }
 
@@ -354,19 +354,20 @@ make_command_stream (int (*get_next_byte) (void *),
      // if(operator_stack_top() == RIGHTP ) //eval stack until a LEFTP is found
       if(i == RIGHTP)
       {
-        // printf("EvalStackuntilLeftP found\n");
+         //printf("EvalStackuntilLeftP found\n");
         evalStackUntilLeftP();
         c = get_next_byte(get_next_byte_argument);
         continue;
       }
       while(g_iOperator_stack_size > 0 && g_iOperand_stack_size > 1 
-          && (precedences[operator_stack_top()] >= precedences[i]))// && operator_stack_top() != LEFTP)) 
+          && (precedences[operator_stack_top()] >= precedences[i]) 
+          && ((operator_stack_top() != LEFTP) && i != RIGHTP )) 
       {
         operand2 = pop_operand();
         operand1 = pop_operand();
         operatorNumber = pop_operator();
-        // printf("popped operands types %d %d\n", operand1->type, operand2->type);
-        // printf("popped operator %s\n", operators[operatorNumber]);
+        //printf("popped operands types %d %d\n", operand1->type, operand2->type);
+        //printf("popped operator %s\n", operators[operatorNumber]);
         //printf("pushed type %d operand on stack\n", operatorNumber);
         push_operand(createCommand(operand1, operand2, operatorNumber));
       }
@@ -435,9 +436,12 @@ make_command_stream (int (*get_next_byte) (void *),
   }
   evalStack();
   // Put last command in command stream
-  commandStream->stream[commandStream->numCommands] = pop_operand();
-  commandStream->numCommands++;
-
+  // if there is one!
+  if(operand_stack_top() != NULL)
+  {
+    commandStream->stream[commandStream->numCommands] = pop_operand();
+    commandStream->numCommands++;
+  }
   //printf("Stack sizes: %d, %d\n", g_iOperator_stack_size, g_iOperand_stack_size);
   //printf("Final command type is %d\n", commandStream->stream[0]->type);
 
@@ -510,7 +514,7 @@ void evalStack()
     operatorNumber = pop_operator();
     push_operand(createCommand(operand1, operand2, operatorNumber));
   }
-
+  //printf("eval stack exited\n");
   if(g_iOperand_stack_size > 1)
   {
     error(1, 0, "%i: Syntax Error. Incorrect number of elements on operand stack after evalStack\n", g_lineNumber);
@@ -519,6 +523,7 @@ void evalStack()
 
 void evalStackUntilLeftP()
 {
+  //printf("eval called\n");
   command_t operand2, operand1;
   int operatorNumber;
   
@@ -534,14 +539,18 @@ void evalStackUntilLeftP()
     operatorNumber = pop_operator();
     push_operand(createCommand(operand1, operand2, operatorNumber));
   }
-
+  //do not assume we have a result. Parenthesis could be empty ().
   pop_operator();// get rid of LEFTP
-  
-  //convert command at the top of operand stack to subshell command.
-  operand1 = pop_operand(); 
-  push_operand(createCommand(operand1, NULL, RIGHTP));
-
-  // printf("Number of operands left %i\n",g_iOperand_stack_size);
+  //printf("Operator_stackTop %i\n",operator_stack_top());
+  //printf("Operand_stacktop %i\n",operand_stack_top());
+  if(operand_stack_top() != NULL)
+  {
+    //convert command at the top of operand stack to subshell command.
+    //printf("pooping operand\n");
+    operand1 = pop_operand(); 
+    push_operand(createCommand(operand1, NULL, RIGHTP));
+  }
+   //printf("Number of operands left %i\n",g_iOperand_stack_size);
   // printf("Number of operators left %i\n",g_iOperator_stack_size);
 }
 
@@ -658,4 +667,3 @@ read_command_stream (command_stream_t s)
   s->currentCommand++;
   return command;
 }
-
