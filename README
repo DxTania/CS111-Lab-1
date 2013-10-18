@@ -11,12 +11,3 @@ which we have not received by this part of the project.
 
 These issues will resolve themselves with further clarification from the TA and more
 test case examples.
-
-
-Stuff that doesn't work:
-
-Executing a subshell command, seg fault when accessing command->u.subshell_command
-Was hoping to make sure (-- && --) && (-- || --) works!
-Also, with the above example there is a syntax error. I believe it is because technically
-the ( has higher priority than the || so it tried to evaluate but can't. So perhaps
-while stack top has higher priority / is not a left parenthesis?
