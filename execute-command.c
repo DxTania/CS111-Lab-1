@@ -49,27 +49,9 @@ execute_command (command_t c, bool time_travel)
 
 int execute_sequence_command(command_t command)
 {
-  int status;
-  pid_t p;
-
-  if( (p = fork()) < 0)
-    error(1,0,"Fork in sequence_command failed");
-
-  if(p == 0)
-  {
-    execute_command(command->u.command[0],false);
-    _exit(command->u.command[0]->status); 
-  }
-  else
-  {
-    execute_command(command->u.command[1],false);
-    
-    if(waitpid(p,&status,0) < 0)
-      error(1,0,"Waitpid in sequence_command failed");
-
-    command->status = command->u.command[1]->status;
-  }
-  
+  execute_command(command->u.command[0],false);
+  execute_command(command->u.command[1],false);
+  command->status = command->u.command[1]->status;
   return command->status;
 }
 
