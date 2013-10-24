@@ -1,6 +1,6 @@
-Student: Carlos Sotelo UID: 303891983
+## Student: Carlos Sotelo UID: 303891983
 
-Student: Tania DePasquale UID: 704018998
+## Student: Tania DePasquale UID: 704018998
 
 It is unclear to us whether or not our parser is supposed to handle
 sequence commands with a single simple command, such as "a;". If so, it is not
@@ -15,20 +15,22 @@ test case examples.
 
 ===============================================================================
 
-Notes:
+# Notes:
 
 Sequence commands when printed will print out (null) if there is no second command.
 This has me believe that we should parse something such as
 
+```
 echo hello;
 
 echo world
+```
 
 As one sequence command, even with the newline character. This is how we do this now.
 
 ===============================================================================
 
-Tania's Notes for Lab 1C:
+# Tania's Notes for Lab 1C:
 
 I created a vector class for representing the listof nodes in the graph, each node
 contains a vector of files (strings) associated with it, and a vector of
@@ -58,12 +60,16 @@ has any.
 
 ===============================================================================
 
-Side-note: Are we supposed to ignore any order we may have wanted from a script?
+#Side-note:
+
+Are we supposed to ignore any order we may have wanted from a script?
 Like say we did:
 
+```
 echo hello
 
 echo world
+```
 
 2 different commands, neither depends on the other. If we parallize this
 it might print out world hello instead of hello world, right? Is that ok?
