@@ -37,6 +37,7 @@ char** createWordArray(char* words)
   int numWords = 5, i = 0, j = 0, wordNum = 0; // prediction
   unsigned int wordArraySize = sizeof(char*) * numWords;
   char** wordArray = checked_malloc(wordArraySize);
+  memset(wordArray, 0, wordArraySize);
 
   while(words[i] != '\0' && words[j]) {
     while(words[j] != ' ' && words[j] != '\0') {
@@ -65,7 +66,7 @@ char** createWordArray(char* words)
 }
 
 // Extracts the word, and input/output(if applicable) into the command
-void extractWordInputOutput(char* currentWord,command_t command)
+void extractWordInputOutput(char* currentWord, command_t command)
 {
   int i = 0, j = 0, expectAnotherRedir = 0;
   int currentWord_size = strlen(currentWord);
@@ -248,11 +249,16 @@ make_command_stream (int (*get_next_byte) (void *),
       possibleNewCommand = 1;
       // Used if a new command is actually started to finish the current one
       lastCommand = currentWord;
+      fpos_t pos;
+      fgetpos(get_next_byte_argument, &pos);
       c = get_next_byte(get_next_byte_argument);
-      if (c != '\n') 
+      if (c != '\n') {
+        fsetpos(get_next_byte_argument, &pos);
         continue;
-      else
+      }
+      else {
         g_lineNumber++;
+      }
     } 
     else if (c == '\n') 
     {
@@ -342,6 +348,7 @@ make_command_stream (int (*get_next_byte) (void *),
         int onlyWhite = getRidOfExtraWhitespaces(operand);
         if(onlyWhite == 0)
           push_operand(createSimpleCommand(operand));
+        // printf("simple out of operand %s\n", operand);
         numChars = 0;
       }
 
@@ -429,6 +436,7 @@ make_command_stream (int (*get_next_byte) (void *),
   if (!isOperator) 
   {
     currentWord[numChars] = '\0';
+    // printf("pushed simple %s\n", currentWord);
     getRidOfExtraWhitespaces(currentWord);
     push_operand(createSimpleCommand(currentWord));
   } else {
@@ -458,7 +466,7 @@ command_t createSimpleCommand(char* currentWord)
 
   extractWordInputOutput(currentWord, simpleCommand);
   //if(simpleCommand->input != NULL || simpleCommand->output != NULL)
-    //printf("simpleCommand input is %s output is %s, word is %s\n",simpleCommand->input,simpleCommand->output,*simpleCommand->u.word);
+  // printf("simpleCommand word is %s\n", currentWord);
   return simpleCommand;
 }
 
