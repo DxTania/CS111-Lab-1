@@ -377,10 +377,8 @@ void speed_of_light(bool time_travel)
         }
       }
     }
-    free(dependencies->elems);
-    free(dependencies);
-    free(no_dependencies->elems);
-    free(no_dependencies);
+    delete_vector(dependencies);
+    delete_vector(no_dependencies);
   }
 }
 

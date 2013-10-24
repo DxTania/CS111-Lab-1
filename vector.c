@@ -37,6 +37,7 @@ void vector_append(vector_t v, void* elem)
   v->size++;
 }
 
+// Add elements from v2 to v1
 void add_vectors(vector_t v1, vector_t v2)
 {
   size_t i;
