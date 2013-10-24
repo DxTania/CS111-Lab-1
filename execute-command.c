@@ -1,5 +1,5 @@
 // UCLA CS 111 Lab 1 command execution
-
+#include "alloc.h"
 #include "command.h"
 #include "command-internals.h"
 #include "vector.h"
@@ -214,6 +214,7 @@ vector_t get_files(command_t command)
     case OR_COMMAND:
     case PIPE_COMMAND:
     {
+      // Left / Right commands
       vector_t filesLeft = get_files(command->u.command[0]);
       vector_t filesRight = get_files(command->u.command[1]);
       add_vectors(files, filesLeft);
@@ -225,20 +226,50 @@ vector_t get_files(command_t command)
     case SIMPLE_COMMAND:
     {
       // in a simple command, all the arguments are considered "files"
-      // start at the first argument and continue
-      char** file;
-      for(file = command->u.word + 1; *file != NULL; file++)
+      // start at the first *argument* and continue, then include I/O
+      char** arg;
+      for(arg = command->u.word + 1; *arg != NULL; arg++)
       {
-        vector_append(files, *file);
+        printf("appending %s\n", *arg);
+        vector_append(files, *arg);
       }
+      vector_append(files, command->input);
+      vector_append(files, command->output);
       break;
     }
     case SUBSHELL_COMMAND:
     {
+      vector_t subFiles = get_files(command->u.subshell_command);
+      add_vectors(files, subFiles);
+      delete_vector(subFiles);
       break;
     }
   }
   return files;
+}
+
+int get_has_dependencies(node_t commandNode)
+{
+  // find files in common with other command nodes (do we need all of them?)
+  size_t i;
+  int flag = 0;
+  for (i = 0; i < dependencies->size; i++)
+  {
+    if (files_intersect((node_t) dependencies->elems[i], commandNode))
+    {
+      vector_append(commandNode->before, dependencies->elems[i]);
+      flag = 1;
+    }
+  }
+  for (i = 0; i < no_dependencies->size; i++)
+  {
+    if (files_intersect((node_t) no_dependencies->elems[i], commandNode))
+    {
+      vector_append(commandNode->before, no_dependencies->elems[i]);
+      flag = 1;
+    }
+  }
+  return flag;
 }
 
 void add_command(command_t command, int time_travel, int print)
@@ -253,14 +284,40 @@ void add_command(command_t command, int time_travel, int print)
     execute_command(command, time_travel);
     return;
   }
-  else
+  else if (!print)
   {
-    vector_append(dependencies, "hi");
+    node_t commandNode = checked_malloc(sizeof(struct node));
+    commandNode->command = command;
+    commandNode->files = get_files(command);
+    commandNode->before = create_vector();
+
+    if(get_has_dependencies(commandNode))
+      vector_append(dependencies, commandNode);
+    else
+      vector_append(no_dependencies, commandNode);
   }
-  size_t i = 0;
+  size_t i = 0, j =0;
   if (print == 1 )
-    for (i = 0; i < dependencies->numElems; i++) {
-      char* command = "hi";//dependencies->elems[i];
-      printf("We currently have command %s\n", command);
+  {
+    for (i = 0; i < dependencies->size; i++) {
+      node_t commandNode = (node_t) dependencies->elems[i];
+      printf("-------------------------------------\n");
+      printf("dependencies for following command: ");
+      print_command(commandNode->command);
+      printf("===\n");
+      for(j = 0; j < commandNode->before->size; j++)
+      {
+        node_t dependency = (node_t) commandNode->before->elems[j];
+        print_command(dependency->command);
+      }
+      printf("-------------------------------------\n");
+      printf("\n");
     }
+    for (i = 0; i < no_dependencies->size; i++) {
+      node_t commandNode = (node_t) no_dependencies->elems[i];
+      print_command(commandNode->command);
+      printf("-------------------------------------\n");
+      printf("\n");
+    }
+  }
 }
