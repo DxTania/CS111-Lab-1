@@ -64,10 +64,11 @@ main (int argc, char **argv)
     else
   	{
   	  last_command = command;
-  	  add_command (command, 1, 0);
+  	  execute_command (command, time_travel);
   	}
   }
-  add_command(NULL, 1, 1);
+  //print();
+  speed_of_light(time_travel);
 
   return print_tree || !last_command ? 0 : command_status (last_command);
 }
