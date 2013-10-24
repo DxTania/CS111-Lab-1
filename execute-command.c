@@ -259,13 +259,13 @@ vector_t get_files(command_t command)
  * Finds any already processed command nodes with intersecting files
  * Returns 1 if the input node now has dependencies, 0 otherwise.
  */
-int get_has_dependencies(node_t commandNode)
+bool get_has_dependencies(node_t commandNode)
 {
   // TODO: Do we need all intersects, or just the closest ones?
   // Currently this only adds direct file dependencies
   // Some command nodes may be added twice if we do all in the path w/o checking for dups
   size_t i;
-  int flag = 0;
+  bool flag = 0;
   for (i = 0; i < dependencies->size; i++)
   {
     if (files_intersect((node_t) dependencies->elems[i], commandNode))
