@@ -40,6 +40,9 @@ int command_status (command_t);
 void evalStack();
 void evalStackUntilLeftP();
 
+void add_command(command_t command);
+void speed_of_light(bool time_travel);
+void print();
 
 int getRidOfExtraWhitespaces(char* word);
 
