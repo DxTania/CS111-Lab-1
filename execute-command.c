@@ -2,6 +2,7 @@
 
 #include "command.h"
 #include "command-internals.h"
+#include "vector.h"
 
 #include <unistd.h>
 #include <error.h>
@@ -13,6 +14,9 @@
 
 /* FIXME: You may need to add #include directives, macro definitions,
    static function definitions, etc.  */
+
+vector_t dependencies = NULL;
+vector_t no_dependencies = NULL;
 
 int
 command_status (command_t c)
@@ -199,3 +203,64 @@ int execute_simple_command(command_t command)
   return command->status;
 }
 
+// Recursively retrieve a vector of all files used within the command (also includes options)
+vector_t get_files(command_t command)
+{
+  vector_t files = create_vector();
+  switch(command->type)
+  {
+    case AND_COMMAND:
+    case SEQUENCE_COMMAND:
+    case OR_COMMAND:
+    case PIPE_COMMAND:
+    {
+      vector_t filesLeft = get_files(command->u.command[0]);
+      vector_t filesRight = get_files(command->u.command[1]);
+      add_vectors(files, filesLeft);
+      add_vectors(files, filesRight);
+      delete_vector(filesLeft);
+      delete_vector(filesRight);
+      break;
+    }
+    case SIMPLE_COMMAND:
+    {
+      // in a simple command, all the arguments are considered "files"
+      // start at the first argument and continue
+      char** file;
+      for(file = command->u.word + 1; *file != NULL; file++)
+      {
+        vector_append(files, *file);
+      }
+      break;
+    }
+    case SUBSHELL_COMMAND:
+    {
+      break;
+    }
+  }
+  return files;
+}
+
+void add_command(command_t command, int time_travel, int print)
+{
+  if (dependencies == NULL)
+    dependencies = create_vector();
+  if (no_dependencies == NULL)
+    no_dependencies = create_vector();
+
+  if (!time_travel)
+  {
+    execute_command(command, time_travel);
+    return;
+  }
+  else
+  {
+    vector_append(dependencies, "hi");
+  }
+  size_t i = 0;
+  if (print == 1 )
+    for (i = 0; i < dependencies->numElems; i++) {
+      char* command = "hi";//dependencies->elems[i];
+      printf("We currently have command %s\n", command);
+    }
+}
