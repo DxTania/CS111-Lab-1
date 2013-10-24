@@ -1,4 +1,5 @@
 Student: Carlos Sotelo UID: 303891983
+
 Student: Tania DePasquale UID: 704018998
 
 It is unclear to us whether or not our parser is supposed to handle
@@ -20,6 +21,7 @@ Sequence commands when printed will print out (null) if there is no second comma
 This has me believe that we should parse something such as
 
 echo hello;
+
 echo world
 
 As one sequence command, even with the newline character. This is how we do this now.
@@ -60,6 +62,7 @@ Side-note: Are we supposed to ignore any order we may have wanted from a script?
 Like say we did:
 
 echo hello
+
 echo world
 
 2 different commands, neither depends on the other. If we parallize this
