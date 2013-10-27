@@ -140,29 +140,18 @@ int execute_pipe_command(command_t command) //a|b
 
 int execute_and_or_command(command_t command)
 {
-  pid_t p;
-  int status;
   command_t left = command->u.command[0];
   command_t right = command->u.command[1];
 
-  p = fork();
-  if( p == 0 )
-  {
-    execute_command(left,false);
-    _exit(left->status);
-  }
-  else
-  {
-    //why fork and wait immediately? Why not just use the parent process to do everything?
-    if(waitpid(p,&status,0) < 0)
-      error(1,0,"Waitpid on and/or failed");
+  execute_command(left,false);
   
-    if( (command->type == AND_COMMAND && left->status == 0) ||
-        (command->type == OR_COMMAND  && left->status != 0))
-    {
-      execute_command(right,false);
-      command->status = right->status;
-    }
+ //why fork and wait immediately? Why not just use the parent process to do everything?
+  
+  if( (command->type == AND_COMMAND && left->status == 0) ||
+      (command->type == OR_COMMAND  && left->status != 0))
+  {
+    execute_command(right,false);
+    command->status = right->status;
   }
   return command->status;
 }

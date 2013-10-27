@@ -6,13 +6,6 @@ It is unclear to us whether or not our parser is supposed to handle
 sequence commands with a single simple command, such as "a;". If so, it is not
 clear how to setup a command struct with it.
 
-Redirection cases are simply handled as a single simple word, since the only mention
-of redirection in the command struct is the buffers for the command input, and output
-which we have not received by this part of the project.
-
-These issues will resolve themselves with further clarification from the TA and more
-test case examples.
-
 ===============================================================================
 
 # Notes:
@@ -28,6 +21,7 @@ echo world
 
 As one sequence command, even with the newline character. This is how we do this now.
 
+Charly: This has been handled.
 ===============================================================================
 
 # Tania's Notes for Lab 1C:
