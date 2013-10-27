@@ -31,7 +31,7 @@ void vector_append(vector_t v, void* elem)
   else if (v->size * sizeof(void*) >= v->memSize)
   {
     v->memSize *= 2;
-    checked_realloc(v->elems, v->memSize);
+    v->elems = checked_realloc(v->elems, v->memSize);
   }
   v->elems[v->size] = elem;
   v->size++;

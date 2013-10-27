@@ -68,6 +68,7 @@ main (int argc, char **argv)
   	}
   }
   //print();
+  
   speed_of_light(time_travel);
 
   return print_tree || !last_command ? 0 : command_status (last_command);

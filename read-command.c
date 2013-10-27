@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "ctype.h"
-
+#include <stdlib.h>
 struct command_stream 
 {
   int numCommands;
@@ -57,7 +57,7 @@ char** createWordArray(char* words)
       if((sizeof(char*) * wordNum) >= wordArraySize) {
         // We have more words than the array can currently hold
         wordArraySize *= 2;
-        checked_realloc(wordArray, wordArraySize);
+        wordArray = checked_realloc(wordArray, wordArraySize);
       }
     }
   }
@@ -195,9 +195,10 @@ make_command_stream (int (*get_next_byte) (void *),
   int i, j, isOperator, numChars = 0, inComment = 0;
   int operatorNumber = 0;
   int possibleNewCommand = 0;
-  unsigned int currentWordSize = 3 * sizeof(char);
+  unsigned int currentWordSize = 16 * sizeof(char);
 
-  char *operand, *lastCommand, *currentWord = checked_malloc(3 * sizeof(char));
+  int lastOperatorWasRightP = 0;
+  char *operand, *lastCommand, *currentWord = checked_malloc(16 * sizeof(char));
   char c = (char) get_next_byte(get_next_byte_argument);
 
   command_t operand1, operand2;
@@ -213,6 +214,7 @@ make_command_stream (int (*get_next_byte) (void *),
   init_stacks();
   while(c != EOF) 
   {
+    //printf("loop entered\n");
     if( c == '\n') 
     {
       g_lineNumber++;
@@ -244,16 +246,24 @@ make_command_stream (int (*get_next_byte) (void *),
      * that the current command is done. The current command will be over if the newline
      * is then followed by another non-operator. Also ignore newlines inside commands.
      */
-    if (!isOperator && c == '\n') 
+
+    //printf("possible New COmmand is set to %i\n",possibleNewCommand);
+    if ( (!isOperator || lastOperatorWasRightP)  && c == '\n') 
     {
       possibleNewCommand = 1;
+      //printf("PossibleNewCommand set to 1 char is %c\n",c);
       // Used if a new command is actually started to finish the current one
       lastCommand = currentWord;
       fpos_t pos;
       fgetpos(get_next_byte_argument, &pos);
       c = get_next_byte(get_next_byte_argument);
-      if (c != '\n') {
+      if (c != '\n') 
+      {
+        //printf("continuing after setting possibleNewCommand to 1\n");
+       // if(c == EOF)
+        // printf("new character is EOF and num of operands left is %i\n",g_iOperand_stack_size);
         fsetpos(get_next_byte_argument, &pos);
+        lastOperatorWasRightP = 0;
         continue;
       }
       else {
@@ -263,13 +273,17 @@ make_command_stream (int (*get_next_byte) (void *),
     else if (c == '\n') 
     {
       c = get_next_byte(get_next_byte_argument);
+      //printf("Operator followed by newlien detected. continiuing\n");
+      
+      lastOperatorWasRightP = 0;
       continue;
     }
-
+    //printf("Checkpoint 2\n");
     /**
      * This loop checks if the current char is an operator. If it is, we create the operator word
      * and then we check the next char in case of double char operators such as || or &&
      */
+    lastOperatorWasRightP = 0;
     isOperator = 0;
     for (i = 0; i < 6; i++) 
     { // check if start of an operator
@@ -286,6 +300,9 @@ make_command_stream (int (*get_next_byte) (void *),
     
         if (c == '|' || c == '&') 
         {
+          if(g_iOperand_stack_size <= 0 && numChars <= 0)
+            error(1,0,"%i: Did not expect binary operator",g_lineNumber);
+          
           char current_char = c;
           c = get_next_byte(get_next_byte_argument);
           currentWord[1] = c;
@@ -321,11 +338,19 @@ make_command_stream (int (*get_next_byte) (void *),
         else if( c == ')')
         {
           //printf("Found rightP\n");
+          lastOperatorWasRightP = 1;
           i = RIGHTP;
           currentWord[1] = '\0';
           fsetpos(get_next_byte_argument, &pos);
         }
-        else 
+        else if( c == ';')  
+        {  
+          if(g_iOperand_stack_size <= 0 && numChars <= 0)
+            error(1,0,"%i: Did not expect binary operator",g_lineNumber);
+          currentWord[1] = '\0';
+          fsetpos(get_next_byte_argument, &pos);
+        }
+        else
         {
           currentWord[1] = '\0';
           fsetpos(get_next_byte_argument, &pos);
@@ -340,10 +365,11 @@ make_command_stream (int (*get_next_byte) (void *),
      */
     if (isOperator) 
     {
+      //printf("isOperator\n");
       if (numChars > 0) 
       {
         operand[numChars] = '\0';
-       // printf("Pushed %s on operand stack\n", operand);
+        //printf("Pushed %s on operand stack\n", operand);
         //get rid of whitespaces in operand here.
         int onlyWhite = getRidOfExtraWhitespaces(operand);
         if(onlyWhite == 0)
@@ -361,9 +387,11 @@ make_command_stream (int (*get_next_byte) (void *),
      // if(operator_stack_top() == RIGHTP ) //eval stack until a LEFTP is found
       if(i == RIGHTP)
       {
-         //printf("EvalStackuntilLeftP found\n");
+        //printf("EvalStackuntilLeftP found. possibleNewCommand is %i\n",possibleNewCommand);
         evalStackUntilLeftP();
+        //printf("current char is %c\n",c);
         c = get_next_byte(get_next_byte_argument);
+        //printf("nextchar is %c\n",c);
         continue;
       }
       while(g_iOperator_stack_size > 0 && g_iOperand_stack_size > 1 
@@ -393,17 +421,39 @@ make_command_stream (int (*get_next_byte) (void *),
     } 
     else if (!possibleNewCommand) 
     {
-      // Grow current word which is an operand if necessary
-      if ((numChars * sizeof(char)) >= currentWordSize)
+      //if last operator was rightP. do not run this.
+      //printf("not a new command. new char is %c, numChars is %i, currentWordSize is %i\n",c,numChars,currentWordSize);
+      if(c != ' ' || numChars > 0)
       {
-        currentWordSize *= 2;
-        checked_realloc(currentWord, currentWordSize);
+        //printf("growing current word %s currentWordSize is %i and numChars is %i\n",currentWord,currentWordSize,numChars);
+        // Grow current word which is an operand if necessary
+        if ((numChars * sizeof(char)) >= currentWordSize)
+        {
+          //printf("doubling size of word %s\n",currentWord);
+          currentWordSize *= 2;
+          //char * buffer = checked_malloc(currentWordSize);
+          //strncpy(buffer,currentWord,numChars);
+          //free((void *)currentWord);
+          //currentWord = checked_malloc(currentWordSize);
+          //strncpy(currentWord,buffer,numChars);
+          currentWord = checked_realloc(currentWord, currentWordSize );// for some reason this was messing up
+          //printf("it is now %s\n",currentWord);
+        }
+        currentWord[numChars] = c;
+        numChars++;
       }
-      currentWord[numChars] = c;
-      numChars++;
     } 
     else 
     {
+      //printf("Going to new command. operand stack size is %i\n",g_iOperand_stack_size);
+      //printf("Operator stack size is %i. numChars is %i\n",g_iOperator_stack_size,numChars);
+       
+      //if(g_iOperand_stack_size <= 0)
+      //{
+       // c =  get_next_byte(get_next_byte_argument);
+       // possibleNewCommand = 0;
+        //continue;
+      //} 
       /**
        * This means that we are about to go onto a new command. We stop the current command and 
        * finish building it with the lastCommand variable, and an operand/operator if necessary.
@@ -411,43 +461,69 @@ make_command_stream (int (*get_next_byte) (void *),
        */
       lastCommand[numChars] = '\0';
       //printf("Last Command getting rid of whites\n"); 
-      getRidOfExtraWhitespaces(lastCommand);
-      push_operand(createSimpleCommand(lastCommand));
+      if(numChars > 0)
+      {
+        //printf("numchars is > 0 so word is %s\n",lastCommand);
+        getRidOfExtraWhitespaces(lastCommand);
+        push_operand(createSimpleCommand(lastCommand));
+      }
+      else if(g_iOperand_stack_size <= 0)
+      {
+        c =  get_next_byte(get_next_byte_argument);
+        possibleNewCommand = 0;
+        continue;
+      } 
+
+      //else
+      //{
+       // printf("numChars == 0 so we are continuing\n");
+        //continue
+       // c = get_next_byte(get_next_byte_argument);
+       // possibleNewCommand = 0;
+       // continue;
+      //}
       evalStack();
       //printf("%s\n", "Finished one command");
 
       if ((commandStream->numCommands * sizeof(struct command)) == commandStream->currentStreamSize)
       {
         commandStream->currentStreamSize *= 2;
-        checked_realloc(commandStream, commandStream->currentStreamSize);
+        commandStream = checked_realloc(commandStream, commandStream->currentStreamSize);
       }
-      commandStream->stream[commandStream->numCommands] = pop_operand();
+      command_t commandToPushToStream = pop_operand();
+      commandToPushToStream->status = -1;
+      commandStream->stream[commandStream->numCommands] = commandToPushToStream;
       // TODO: if stack not empty, there was an error?
       commandStream->numCommands++;
       numChars = 0;
       currentWord = checked_malloc(3 * sizeof(char)); // prevent overwriting
     }
-
+    //printf("PossibleNewCOmmand set to 0 right before checkpoint1\n");
     c = get_next_byte(get_next_byte_argument);
     possibleNewCommand = 0;
   }
 
+  //printf("Checkpoint1. possibleNEwCommand is %i num of operands is %i\n",possibleNewCommand,g_iOperand_stack_size);
   // Push last word onto operand stack and evaluate the rest
   if (!isOperator) 
   {
     currentWord[numChars] = '\0';
-    // printf("pushed simple %s\n", currentWord);
+    //printf("pushed simple word %s with word count %i strlen is %i\n", currentWord,numChars,(int)strlen(currentWord));
     getRidOfExtraWhitespaces(currentWord);
-    push_operand(createSimpleCommand(currentWord));
+    if(strlen(currentWord) > 0)
+      push_operand(createSimpleCommand(currentWord));
   } else {
     // if a semicolon, valid?
   }
+  //printf("evalstack at the end of loop\n");
   evalStack();
   // Put last command in command stream
   // if there is one!
   if(operand_stack_top() != NULL)
   {
-    commandStream->stream[commandStream->numCommands] = pop_operand();
+    command_t commandToPushToStream = pop_operand();
+    commandToPushToStream->status = -1;
+    commandStream->stream[commandStream->numCommands] = commandToPushToStream;
     commandStream->numCommands++;
   }
   //printf("Stack sizes: %d, %d\n", g_iOperator_stack_size, g_iOperand_stack_size);
@@ -458,7 +534,7 @@ make_command_stream (int (*get_next_byte) (void *),
 
 command_t createSimpleCommand(char* currentWord)
 {
-
+  //printf("creating simple command with word %s\n",currentWord);
   if (isValidWordCharacter(currentWord) == 0)
     error(1,0,"%i: Invalid word character",g_lineNumber);
  
@@ -491,6 +567,11 @@ command_t createCommand(command_t operand1, command_t operand2, int operatorNumb
       newCommand->u.command[1] = operand2;
       break; 
     case SEMIC: 
+      if(operand1 == NULL)
+      {
+        operand1 = operand2;
+        operand2 = NULL;
+      }
       newCommand->type = SEQUENCE_COMMAND;
       newCommand->u.command[0] = operand1;
       newCommand->u.command[1] = operand2;
@@ -511,18 +592,19 @@ command_t createCommand(command_t operand1, command_t operand2, int operatorNumb
  */
 void evalStack()
 {
-  //printf("Eval stack called\n");
   command_t operand2, operand1;
   int operatorNumber;
 
   while(g_iOperator_stack_size > 0) 
   {
     operand2 = pop_operand();
-    operand1 = pop_operand();
+   // if( !( g_iOperand_stack_size <= 0 && operator_stack_top() == SEMIC) )
+      operand1 = pop_operand();
+   // else //allow ';' to only have one operand
+   //   operand1 = NULL;
     operatorNumber = pop_operator();
     push_operand(createCommand(operand1, operand2, operatorNumber));
   }
-  //printf("eval stack exited\n");
   if(g_iOperand_stack_size > 1)
   {
     error(1, 0, "%i: Syntax Error. Incorrect number of elements on operand stack after evalStack\n", g_lineNumber);
@@ -531,7 +613,7 @@ void evalStack()
 
 void evalStackUntilLeftP()
 {
-  //printf("eval called\n");
+  //printf("eval leftp called\n");
   command_t operand2, operand1;
   int operatorNumber;
   
@@ -558,8 +640,8 @@ void evalStackUntilLeftP()
     operand1 = pop_operand(); 
     push_operand(createCommand(operand1, NULL, RIGHTP));
   }
-   //printf("Number of operands left %i\n",g_iOperand_stack_size);
-  // printf("Number of operators left %i\n",g_iOperator_stack_size);
+  //printf("Number of operands left %i\n",g_iOperand_stack_size);
+   //printf("Number of operators left %i\n",g_iOperator_stack_size);
 }
 
 void checkForConsecutiveRedir(char* word)

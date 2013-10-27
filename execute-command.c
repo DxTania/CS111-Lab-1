@@ -62,8 +62,13 @@ int execute_sequence_command(command_t command)
 {
   // account for empty second part of sequence
   execute_command(command->u.command[0],false);
-  execute_command(command->u.command[1],false);
-  command->status = command->u.command[1]->status;
+  if(command->u.command[1])  //allow semicolon to act as a unary operator
+  {
+    execute_command(command->u.command[1],false);
+    command->status = command->u.command[1]->status;
+  }
+  else
+    command->status = command->u.command[0]->status; 
   return command->status;
 }
 
@@ -307,23 +312,50 @@ void add_command(command_t command)
     vector_append(no_dependencies, commandNode);
 }
 
+//returns 1 if all the commands this node depend on have finished
+//returns 0 otherwise
+int freeToRun(node_t commandNode)
+{
+  //printf("free to run called\n");
+  size_t i;
+
+  if(commandNode == NULL)
+    return -1;
+
+  // check to see if commands it depends on have even started running.
+  for(i = 0; i < commandNode->before->size; i++)
+  {  
+    //printf("pid of dependency is %i\n",((node_t)commandNode->before->elems[i])->pid);
+    //printf("return status of dependency is %i\n",((node_t)commandNode->before->elems[i])->command->status);
+    if( ((node_t)commandNode->before->elems[i])->pid == -1  
+     || ((node_t)commandNode->before->elems[i])->command->status != 0 )
+    {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 /**
  * Call this function to run all added commands in parallel.
  * TODO: THIS ISN'T FINISHED & DOESN'T WORK RIGHT!
  */
 void speed_of_light(bool time_travel)
 {
-  if (time_travel)
-  {
-    size_t i, j;
-    node_t commandNode, dependency;
-    pid_t pid;
-    int status, depsize = dependencies->size;
-    bool skip = false;
+  if (!time_travel)
+    return;
 
+    size_t i;
+    node_t commandNode;//, dependency;
+    pid_t pid;
+    //int status, depsize = dependencies->size;
+    //bool skip = false;
+
+    //printf("no dependences size is %i\n",(int) no_dependencies->size);
     // First fork processes for each command that has no dependencies
     for (i = 0; i < no_dependencies->size; i++)
     {
+      //printf("no_dependencies->elems[i]->command->status is %i\n",((node_t)no_dependencies->elems[i])->command->status);
       pid = fork();
       commandNode = (node_t) no_dependencies->elems[i];
       if (pid == 0)
@@ -334,52 +366,91 @@ void speed_of_light(bool time_travel)
       else
         commandNode->pid = pid;
     }
-
-    // Then handle the commands who do have to wait
-    while(depsize > 0)
+    
+    //wait for all commands to finish?
+    //this prevents some dependent commands from executing until all
+    //non_dependent comands are done.
+    for(i = 0;i < no_dependencies->size ; i++)
     {
-      if (i == dependencies->size) i = 0;
+      int status;
+      commandNode = (node_t) no_dependencies->elems[i];
+      if(waitpid(commandNode->pid,&status,0) < 0)
+        error(1,0,"speed of light error\n");
+      else
+        commandNode->command->status = WEXITSTATUS(status);
+    }
+
+    //for(i = 0 ; i < no_dependencies->size;i++)
+      //printf("Checkin no_dependencies->elems[i]->command->status is %i\n",((node_t)no_dependencies->elems[i])->command->status);
+    
+    //printf("dependencies->size is %i\n",(int)dependencies->size);
+    int depSize = (int) dependencies->size;
+    while( depSize > 0)
+    {      
       for(i = 0; i < dependencies->size; i++)
       {
-        if (dependencies->elems[i] == NULL) continue;
 
         commandNode = (node_t) dependencies->elems[i];
-        for (j = 0; j < commandNode->before->size; j++)
-        {
-          // If a pid has not yet been assigned to what this node depends on, skip it
-          if ( ((node_t)commandNode->before->elems[j])->pid == -1)
-          {
-            skip = true;
-            break;
-          }
-        }
-        if (skip) continue;
-
+        //printf("current commands status %i and pid %i\n",commandNode->command->status,commandNode->pid);
+        if(commandNode->pid > 0 || commandNode->command->status == 0)
+          continue;
+       
+        int iFree = freeToRun((node_t)dependencies->elems[i]);
+        //printf("free is %i. depsize is %i\n",iFree,depSize);
+        if( iFree == 0 )
+          continue;
+        
+        //printf("forking with command index %i %s\n",(int)i,commandNode->command->u.word[0]);
+        depSize--;
         pid = fork();
-        commandNode = (node_t) dependencies->elems[i];
-        if (pid == 0)
+        if(pid == 0)
         {
-          // wait for each dependency before we execute
-          // can you give waitpid a list?
-          for (j = 0; j < commandNode->before->size; j++)
-          {
-            dependency = (node_t) commandNode->before->elems[j];
-            waitpid(dependency->pid, &status, 0);
-          }
-          dependencies->elems[i] = NULL;
-          depsize--;
-          execute_command(commandNode->command, 0);
+          execute_command(commandNode->command,0);
           _exit(commandNode->command->status);
         }
         else
         {
           commandNode->pid = pid;
+          //dependencies->elems[i] = NULL;
+          //waitpid(
         }
       }
+      
+      for(i = 0; i < dependencies->size;i++)
+      { 
+        //printf("iterating");
+        commandNode = (node_t) dependencies->elems[i];
+        if(commandNode == NULL || commandNode->command->status == 0 || commandNode->pid < 0)
+          continue;
+        //printf("trying to check if item %i with pid %i is finished\n",(int)i,commandNode->pid);
+        int status;
+        int waitpidReturnVal = waitpid(commandNode->pid,&status,WNOHANG);
+        //printf("waitpid passed\n");
+        if(waitpidReturnVal < 0)
+          error(1,0,"Error waiting on child");
+        else if( waitpidReturnVal > 0 )
+        {
+          //printf("element %i returned %i\n",(int)i,WEXITSTATUS(status));
+          commandNode->command->status = WEXITSTATUS(status);
+        }
+        //printf("insideloop\n");
+        //printf("dependenceis is %i depSize is %i\n",(int) dependencies->size,depSize);
+      }
+      //printf("looping\n");
     }
-    delete_vector(dependencies);
-    delete_vector(no_dependencies);
-  }
+    
+    for(i = 0;i < dependencies->size ; i++)
+    {
+      int status;
+      commandNode = (node_t) dependencies->elems[i];
+      if(commandNode == NULL || commandNode->command == NULL || commandNode->command->status ==0)
+        continue;
+
+      if(waitpid(commandNode->pid,&status,0) < 0)
+        error(1,0,"speed of light error\n");
+      else
+        commandNode->command->status = WEXITSTATUS(status);
+    }
 }
 
 // Prints out the dependences for each command with dependences
@@ -387,6 +458,9 @@ void speed_of_light(bool time_travel)
 void print()
 {
   size_t i = 0, j =0;
+  if(dependencies != NULL)
+  {
+  printf("dependencies:\n");
   for (i = 0; i < dependencies->size; i++) {
     node_t commandNode = (node_t) dependencies->elems[i];
     printf("-------------------------------------\n");
@@ -401,10 +475,16 @@ void print()
     printf("-------------------------------------\n");
     printf("\n");
   }
+  }
+  
+  if( no_dependencies != NULL)
+  {
+  printf("no dependencies:\n");
   for (i = 0; i < no_dependencies->size; i++) {
     node_t commandNode = (node_t) no_dependencies->elems[i];
     print_command(commandNode->command);
     printf("-------------------------------------\n");
     printf("\n");
+  }
   }
 }
